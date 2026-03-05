@@ -26,3 +26,9 @@ CREATE TABLE IF NOT EXISTS requests (
   started_at TIMESTAMP,
   finished_at TIMESTAMP
 );
+
+-- Seed a default prompt used by the frontend and tests. Insert only if missing.
+INSERT INTO prompts (id, title, description, template, model, temperature, max_tokens)
+SELECT 'summarize_v1', 'Summarize Text', 'Summarize a block of text into a short paragraph.',
+  'Please provide a concise summary for the following text:\n\n{{.input}}', 'gpt-3.5-turbo', 0.2, 512
+WHERE NOT EXISTS (SELECT 1 FROM prompts WHERE id = 'summarize_v1');

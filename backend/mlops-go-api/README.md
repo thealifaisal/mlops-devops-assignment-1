@@ -20,3 +20,7 @@ Notes:
   - `GET /api/v1/options` — list prompt options
   - `POST /api/v1/generate` — start async generation (returns 202)
   - `GET /api/v1/requests/{id}` — poll request status
+
+Additional notes:
+- If you want to run with Postgres, set `DATABASE_URL` and the server will run migrations from `internal/db/migrations` at startup.
+- A health endpoint is available at `GET /health` which reports DB connectivity (when configured) and LLM availability.

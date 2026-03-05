@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"mlops-go-api/internal/db"
 	"mlops-go-api/internal/llm"
@@ -131,6 +133,46 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET request %s status=%s", id, reqObj.Status)
 
 	writeSuccess(w, http.StatusOK, resp)
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "INVALID_METHOD", "only GET allowed")
+		return
+	}
+
+	status := "ok"
+	res := map[string]interface{}{"status": status}
+
+	// DB check if configured
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		d, err := db.Connect(url)
+		if err != nil {
+			res["db"] = "down"
+			res["status"] = "degraded"
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if err := d.PingContext(ctx); err != nil {
+				res["db"] = "down"
+				res["status"] = "degraded"
+			} else {
+				res["db"] = "ok"
+			}
+			_ = d.Close()
+		}
+	} else {
+		res["db"] = "memory"
+	}
+
+	// LLM presence
+	if llm.NewFromEnv() != nil {
+		res["llm"] = "available"
+	} else {
+		res["llm"] = "unavailable"
+	}
+
+	writeSuccess(w, http.StatusOK, res)
 }
 
 // SetDeps allows tests to inject a repo and generator.
