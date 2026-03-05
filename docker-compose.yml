@@ -20,6 +20,7 @@ services:
     build:
       context: .
       dockerfile: backend/mlops-go-api/Dockerfile
+    container_name: mlops-a1-backend
     env_file: .env
     environment:
       - PORT=8080
@@ -33,10 +34,15 @@ services:
     build:
       context: .
       dockerfile: frontend/mlops-react-app/Dockerfile
+      args:
+        REACT_APP_API_BASE: "http://backend:8080/api"
+    container_name: mlops-a1-frontend
     ports:
       - "3000:80"
     depends_on:
       - backend
+  postgres:
+    container_name: mlops-a1-postgres
 
 volumes:
   pgdata:

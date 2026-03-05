@@ -32,7 +32,7 @@ type RequestResponse = {
   latencyMs?: number;
 };
 
-const API_BASE = "/api";
+const API_BASE = (process.env.REACT_APP_API_BASE as string) || "/api";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
