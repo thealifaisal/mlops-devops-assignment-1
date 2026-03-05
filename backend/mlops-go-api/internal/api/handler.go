@@ -5,21 +5,44 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
+	"mlops-go-api/internal/db"
 	"mlops-go-api/internal/repo"
 	"mlops-go-api/internal/service"
 )
 
-var store = repo.NewStore()
-var gen = service.NewGenerator(store)
+var store repo.Repo
+var gen *service.Generator
 
+func init() {
+	// prefer DATABASE_URL if set
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		d, err := db.Connect(url)
+		if err == nil {
+			// run migrations (best-effort)
+			_ = db.Migrate(d, "internal/db/migrations")
+			store = repo.NewDBStore(d)
+			gen = service.NewGenerator(store)
+			log.Printf("using Postgres store")
+			return
+		}
+		log.Printf("failed to connect to DB, falling back to memory store: %v", err)
+	}
+	store = repo.NewStore()
+	gen = service.NewGenerator(store)
+}
 func optionsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "INVALID_METHOD", "only GET allowed")
 		return
 	}
-	prompts := store.ListPrompts()
+	prompts, err := store.ListPrompts()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "DB_ERROR", "could not list prompts")
+		return
+	}
 	data := make([]map[string]string, 0, len(prompts))
 	for _, p := range prompts {
 		data = append(data, map[string]string{"id": p.ID, "title": p.Title, "description": p.Description})

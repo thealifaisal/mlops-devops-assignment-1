@@ -9,10 +9,10 @@ import (
 )
 
 type Generator struct {
-	store *repo.Store
+	store repo.Repo
 }
 
-func NewGenerator(s *repo.Store) *Generator {
+func NewGenerator(s repo.Repo) *Generator {
 	return &Generator{store: s}
 }
 
