@@ -16,7 +16,7 @@ type Request struct {
 	InputJSON  map[string]interface{} `json:"inputJson"`
 	Status     string                 `json:"status"`
 	ResultText string                 `json:"text,omitempty"`
-	Error      string                 `json:"error_message,omitempty"`
+	Error      string                 `json:"error,omitempty"`
 	Usage      map[string]int         `json:"usage,omitempty"`
 	LatencyMS  int                    `json:"latencyMs,omitempty"`
 	CreatedAt  time.Time

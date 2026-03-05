@@ -126,7 +126,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		"usage":     reqObj.Usage,
 	}
 	if reqObj.Status == "failed" {
-		resp["error_message"] = reqObj.Error
+		resp["error"] = reqObj.Error
 	}
 
 	// Log simple access
