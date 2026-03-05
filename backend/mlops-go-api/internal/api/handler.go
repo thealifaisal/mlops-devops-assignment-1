@@ -132,3 +132,9 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 
 	writeSuccess(w, http.StatusOK, resp)
 }
+
+// SetDeps allows tests to inject a repo and generator.
+func SetDeps(s repo.Repo, g *service.Generator) {
+	store = s
+	gen = g
+}
