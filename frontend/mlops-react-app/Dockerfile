@@ -2,7 +2,7 @@
 FROM node:18 AS build
 WORKDIR /app
 COPY frontend/mlops-react-app/package.json frontend/mlops-react-app/package-lock.json* ./
-RUN npm ci || npm install
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 COPY frontend/mlops-react-app ./
 RUN npm run build
 
