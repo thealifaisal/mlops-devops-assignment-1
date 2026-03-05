@@ -2,6 +2,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
+    container_name: mlops-a1-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mlops}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -41,8 +42,6 @@ services:
       - "3000:80"
     depends_on:
       - backend
-  postgres:
-    container_name: mlops-a1-postgres
-
+ 
 volumes:
   pgdata:
