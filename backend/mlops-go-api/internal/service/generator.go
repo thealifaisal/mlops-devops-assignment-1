@@ -12,11 +12,11 @@ import (
 
 type Generator struct {
 	store repo.Repo
-	llm   *llm.Client
+	llm   llm.Client
 }
 
-func NewGenerator(s repo.Repo) *Generator {
-	return &Generator{store: s, llm: llm.NewFromEnv()}
+func NewGenerator(s repo.Repo, l llm.Client) *Generator {
+	return &Generator{store: s, llm: l}
 }
 
 func (g *Generator) StartProcessing(id string) {
@@ -46,7 +46,7 @@ func (g *Generator) StartProcessing(id string) {
 		var text string
 		var usage map[string]int
 		if g.llm != nil {
-			ctx, cancel := context.WithTimeout(context.Background(),  time.Second*120)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*120)
 			defer cancel()
 			t, u, err := g.llm.Generate(ctx, rendered)
 			if err == nil {

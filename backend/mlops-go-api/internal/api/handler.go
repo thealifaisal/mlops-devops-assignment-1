@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"mlops-go-api/internal/db"
+	"mlops-go-api/internal/llm"
 	"mlops-go-api/internal/repo"
 	"mlops-go-api/internal/service"
 )
@@ -24,14 +25,16 @@ func init() {
 			// run migrations (best-effort)
 			_ = db.Migrate(d, "internal/db/migrations")
 			store = repo.NewDBStore(d)
-			gen = service.NewGenerator(store)
+			llmClient := llm.NewFromEnv()
+			gen = service.NewGenerator(store, llmClient)
 			log.Printf("using Postgres store")
 			return
 		}
 		log.Printf("failed to connect to DB, falling back to memory store: %v", err)
 	}
 	store = repo.NewStore()
-	gen = service.NewGenerator(store)
+	llmClient := llm.NewFromEnv()
+	gen = service.NewGenerator(store, llmClient)
 }
 func optionsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

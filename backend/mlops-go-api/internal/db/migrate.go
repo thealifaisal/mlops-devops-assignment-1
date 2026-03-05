@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
-	"os"
 )
 
 // Migrate executes SQL files found under the given directory in lexical order.
