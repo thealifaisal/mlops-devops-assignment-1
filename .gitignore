@@ -48,6 +48,9 @@ out/
 .env.test.local
 .env.production.local
 
+# Compose environment file (local overrides) - keep out of VCS
+.env
+
 # Editor directories and files
 .vscode/
 .idea/
