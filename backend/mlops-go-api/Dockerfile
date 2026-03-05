@@ -1,6 +1,6 @@
 # backend/mlops-go-api/Dockerfile
 # Build the Go binary
-FROM golang:1.20-alpine AS build
+FROM golang:1.21-alpine AS build
 WORKDIR /src
 COPY ./backend/mlops-go-api/go.mod ./backend/mlops-go-api/go.sum ./backend/mlops-go-api/
 RUN cd backend/mlops-go-api && go mod download
