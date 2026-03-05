@@ -1,0 +1,38 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary and coverage
+*.test
+coverage.out
+
+# Common outputs
+*.out
+*.prof
+*.log
+
+# Build output
+/bin/
+/build/
+
+# Dependency directories
+/vendor/
+
+# Local env files
+.env
+.env.*
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# Go tooling
+*.coverprofile
+
+# Tool caches
+.cache/
