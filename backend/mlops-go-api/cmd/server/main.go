@@ -21,9 +21,12 @@ func main() {
 	mux := http.NewServeMux()
 	api.RegisterRoutes(mux)
 
+	// wrap mux with CORS middleware so the browser can call the backend
+	handler := allowCORS(mux)
+
 	srv := &http.Server{
 		Addr:    ":" + port,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	// start server
@@ -46,4 +49,19 @@ func main() {
 		log.Fatalf("graceful shutdown failed: %v", err)
 	}
 	log.Printf("server stopped")
+}
+
+// allowCORS adds permissive CORS headers (suitable for local development).
+// It also handles OPTIONS preflight requests.
+func allowCORS(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
