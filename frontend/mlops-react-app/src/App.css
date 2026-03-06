@@ -25,6 +25,21 @@ body{background:linear-gradient(180deg,#071029 0%, #071323 100%);color:#e6eef6}
 .select,.textarea,.input{width:100%;padding:12px;border-radius:8px;background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:inherit;font-size:14px}
 .textarea{min-height:160px;resize:vertical}
 
+/* Custom select arrow and alignment fixes across browsers */
+.select{
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 44px; /* space for arrow */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23aab6c6'><path d='M5.23 7.21a.75.75 0 0 1 1.06-.02L10 10.828l3.71-3.64a.75.75 0 0 1 1.04 1.08l-4.24 4.16a.75.75 0 0 1-1.06 0L5.25 8.27a.75.75 0 0 1-.02-1.06z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+}
+
+/* Ensure the select has consistent line-height and arrow vertically centered */
+.select option{background:transparent;color:inherit}
+
 .row{display:flex;gap:10px;align-items:center}
 .btn{background:linear-gradient(90deg,var(--primary),#4f46e5);color:#042b31;padding:10px 14px;border-radius:10px;border:none;font-weight:600;cursor:pointer}
 .btn:disabled{opacity:0.5;cursor:not-allowed}
@@ -43,4 +58,6 @@ body{background:linear-gradient(180deg,#071029 0%, #071323 100%);color:#e6eef6}
 
 /* accessibility */
 .select:focus,.textarea:focus,.btn:focus{outline:2px solid rgba(99,102,241,0.16);outline-offset:2px}
+
+.select::-ms-expand{ display: none; } /* hide default arrow in IE/Edge */
 
