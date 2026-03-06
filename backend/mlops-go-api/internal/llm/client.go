@@ -95,7 +95,7 @@ func (c *httpClient) Generate(ctx context.Context, prompt string) (string, map[s
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
-		Usage map[string]int `json:"usage"`
+		Usage map[string]interface{} `json:"usage"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return "", nil, err
@@ -104,5 +104,19 @@ func (c *httpClient) Generate(ctx context.Context, prompt string) (string, map[s
 	if len(out.Choices) > 0 {
 		text = out.Choices[0].Message.Content
 	}
-	return text, out.Usage, nil
+	// normalize usage into map[string]int (ignore nested objects)
+	usageMap := map[string]int{}
+	for k, v := range out.Usage {
+		switch val := v.(type) {
+		case float64:
+			usageMap[k] = int(val)
+		case int:
+			usageMap[k] = val
+		case int64:
+			usageMap[k] = int(val)
+		default:
+			// ignore nested objects or non-numeric values
+		}
+	}
+	return text, usageMap, nil
 }
