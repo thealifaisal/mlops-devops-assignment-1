@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"log"
 
 	"mlops-go-api/internal/llm"
 	"mlops-go-api/internal/repo"
@@ -45,21 +46,24 @@ func (g *Generator) StartProcessing(id string) {
 		start := time.Now()
 		var text string
 		var usage map[string]int
-		if g.llm != nil {
+		if g.llm == nil {
+			log.Printf("generator: LLM client is nil, using simulated output")
+			text = fmt.Sprintf("Generated (simulated):\n%s", rendered)
+			usage = map[string]int{"inputTokens": 10, "outputTokens": 20}
+		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*120)
 			defer cancel()
 			t, u, err := g.llm.Generate(ctx, rendered)
-			if err == nil {
-				text = t
-				usage = u
-			} else {
+			if err != nil {
+				log.Printf("generator: llm.Generate error=%v", err)
 				// fallback
 				text = fmt.Sprintf("Generated (simulated-fallback):\n%s", rendered)
 				usage = map[string]int{"inputTokens": 0, "outputTokens": 0}
+			} else {
+				log.Printf("generator: llm.Generate succeeded, tokens=%v", u)
+				text = t
+				usage = u
 			}
-		} else {
-			text = fmt.Sprintf("Generated (simulated):\n%s", rendered)
-			usage = map[string]int{"inputTokens": 10, "outputTokens": 20}
 		}
 		latency := time.Since(start)
 
