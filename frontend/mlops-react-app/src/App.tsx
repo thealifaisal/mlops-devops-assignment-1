@@ -234,120 +234,70 @@ export default function App() {
   // UI
   // ------------------------
   return (
-    <div style={{ maxWidth: 900, margin: "30px auto", fontFamily: "Arial" }}>
-      <h1>LLM Prompt Runner</h1>
-      
+    <div className="app-shell">
+      <div className="topbar">
+        <div className="brand">
+          <h1>LLM Prompt Runner</h1>
+          <p className="small">Lightweight prompt playground</p>
+        </div>
+        <div className="controls">
+          <div className="small">Status: <span className="status-pill">{status||'idle'}</span></div>
+        </div>
+      </div>
+
       {!serverAvailable && (
-        <div style={{ 
-          background: "#f8d7da", 
-          border: "1px solid #f5c6cb", 
-          color: "#721c24",
-          padding: "15px", 
-          borderRadius: "4px",
-          marginBottom: "20px"
-        }}>
-          <strong>❌ Server Unavailable</strong>
-          <p style={{ margin: "8px 0" }}>
-            The backend server is not responding. Please ensure the server is running and try again.
-          </p>
-          <button 
-            onClick={retryConnection}
-            disabled={isCheckingServer}
-            style={{
-              padding: "8px 16px",
-              background: "#721c24",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: isCheckingServer ? "not-allowed" : "pointer",
-              opacity: isCheckingServer ? 0.6 : 1
-            }}
-          >
-            {isCheckingServer ? "Checking..." : "Retry Connection"}
-          </button>
+        <div className="card" style={{marginTop:12}}>
+          <strong style={{color:'#ffb4b4'}}>Server Unavailable</strong>
+          <div className="small" style={{marginTop:8}}>The backend server is not responding.</div>
+          <div style={{marginTop:12}}>
+            <button className="btn" onClick={retryConnection} disabled={isCheckingServer}>{isCheckingServer? 'Checking...':'Retry'}</button>
+          </div>
         </div>
       )}
 
-      <div style={{ marginBottom: 20 }}>
-        <label>Option:</label>
-        <select
-          value={selectedOptionId}
-          onChange={(e) => setSelectedOptionId(e.target.value)}
-          disabled={!serverAvailable}
-          style={{ opacity: serverAvailable ? 1 : 0.5 }}
-        >
-          {options.length === 0 && (
-            <option value="">No options available</option>
-          )}
-          {options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.title}
-            </option>
-          ))}
-        </select>
-      </div>
+      <div className="grid">
+        <div>
+          <div className="card">
+            <label className="label">Option</label>
+            <select className="select" value={selectedOptionId} onChange={(e)=>setSelectedOptionId(e.target.value)}>
+              {options.map(o=> <option key={o.id} value={o.id}>{o.title}</option>)}
+            </select>
 
-      <div>
-        <textarea
-          rows={6}
-          style={{ width: "100%" }}
-          placeholder="Enter text..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-      </div>
+            <label className="label" style={{marginTop:12}}>Input</label>
+            <textarea className="textarea" placeholder="Enter text..." value={text} onChange={(e)=>setText(e.target.value)} />
 
-      <div style={{ marginTop: 10 }}>
-        <button 
-          disabled={!canSubmit} 
-          onClick={onSubmit}
-          title={!serverAvailable ? "Server is unavailable" : ""}
-        >
-          {isSubmitting ? "Submitting..." : "Generate"}
-        </button>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}>
+              <div style={{display:'flex',gap:8}}>
+                <button className="btn" onClick={onSubmit} disabled={!canSubmit}>{isSubmitting? 'Submitting...':'Generate'}</button>
+                <button className="btn-ghost" onClick={reset}>Reset</button>
+              </div>
+              <div className="small">Request: {requestId || '—'}</div>
+            </div>
 
-        <button onClick={reset} style={{ marginLeft: 10 }}>
-          Reset
-        </button>
-        
-        {!serverAvailable && (
-          <span style={{ marginLeft: 10, color: "#721c24", fontSize: "14px" }}>
-            ❌ Server unavailable - Generate button disabled
-          </span>
-        )}
-      </div>
+            <div className="meta">
+              <div>Latency: <b>{meta?.latencyMs??'—'}</b> ms</div>
+              <div>Tokens: <b>{meta?.usage?.inputTokens??'—'}</b> / <b>{meta?.usage?.outputTokens??'—'}</b></div>
+            </div>
+          </div>
+        </div>
 
-      <hr />
+        <div>
+          <div className="card">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <div className="small">Status</div>
+                <div style={{fontWeight:700}}>{status || 'idle'}</div>
+              </div>
+              <div className="small">ID: {requestId || '—'}</div>
+            </div>
 
-      <div>
-        <p><b>Status:</b> {status || "idle"}</p>
-        <p><b>Request ID:</b> {requestId || "—"}</p>
+            {error && <div style={{marginTop:12,color:'#ffb4b4'}}>{error}</div>}
 
-        {error && (
-          <p style={{ 
-            color: "#721c24",
-            background: "#f8d7da",
-            padding: "10px",
-            borderRadius: "4px",
-            border: "1px solid #f5c6cb"
-          }}>
-            {error}
-          </p>
-        )}
+            <div style={{marginTop:12}} className="output">{output || 'Waiting for generation...'}</div>
 
-        {meta?.latencyMs && (
-          <p>Latency: {meta.latencyMs} ms</p>
-        )}
-
-        {meta?.usage && (
-          <p>
-            Tokens: {meta.usage.inputTokens} / {meta.usage.outputTokens}
-          </p>
-        )}
-
-        <pre style={{ background: "#eee", padding: 10 }}>
-          {output || "Waiting..."}
-        </pre>
+            <div className="footer-note">Tip: switch options to try different prompt templates.</div>
+          </div>
+        </div>
       </div>
     </div>
   );
