@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -68,9 +70,14 @@ func (c *httpClient) Generate(ctx context.Context, prompt string) (string, map[s
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
+		// read and log response body for diagnostics
+		b, _ := io.ReadAll(resp.Body)
+		log.Printf("llm http error status=%d body=%s", resp.StatusCode, string(b))
 		var errBody map[string]interface{}
-		_ = json.NewDecoder(resp.Body).Decode(&errBody)
-		return "", nil, fmt.Errorf("llm error: %v", errBody)
+		if err := json.Unmarshal(b, &errBody); err == nil {
+			return "", nil, fmt.Errorf("llm error: status=%d body=%v", resp.StatusCode, errBody)
+		}
+		return "", nil, fmt.Errorf("llm error: status=%d body=%s", resp.StatusCode, string(b))
 	}
 
 	var out struct {
