@@ -157,9 +157,11 @@ func (d *dbStore) CreateRequest(promptID string, input map[string]interface{}) (
 func (d *dbStore) GetRequest(id string) (*model.Request, error) {
 	var r model.Request
 	var inputB, usageB sql.NullString
+	var resultB, errorB sql.NullString
+	var latencyB sql.NullInt64
 	var startedAt, finishedAt sql.NullTime
 	err := d.db.QueryRow("SELECT id, prompt_id, input_json, status, result_text, error_message, usage_json, latency_ms, created_at, updated_at, started_at, finished_at FROM requests WHERE id=$1", id).
-		Scan(&r.ID, &r.PromptID, &inputB, &r.Status, &r.ResultText, &r.Error, &usageB, &r.LatencyMS, &r.CreatedAt, &r.UpdatedAt, &startedAt, &finishedAt)
+		Scan(&r.ID, &r.PromptID, &inputB, &r.Status, &resultB, &errorB, &usageB, &latencyB, &r.CreatedAt, &r.UpdatedAt, &startedAt, &finishedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -172,11 +174,20 @@ func (d *dbStore) GetRequest(id string) (*model.Request, error) {
 			r.InputJSON = m
 		}
 	}
+	if resultB.Valid {
+		r.ResultText = resultB.String
+	}
+	if errorB.Valid {
+		r.Error = errorB.String
+	}
 	if usageB.Valid {
 		var um map[string]int
 		if err := json.Unmarshal([]byte(usageB.String), &um); err == nil {
 			r.Usage = um
 		}
+	}
+	if latencyB.Valid {
+		r.LatencyMS = int(latencyB.Int64)
 	}
 	if startedAt.Valid {
 		r.StartedAt = startedAt.Time

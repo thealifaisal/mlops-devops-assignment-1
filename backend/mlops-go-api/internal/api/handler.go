@@ -114,6 +114,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET request id=%q", id)
 	reqObj, err := store.GetRequest(id)
 	if err != nil {
+		log.Printf("GET request id=%q error=%v", id, err)
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "request not found")
 		return
 	}
