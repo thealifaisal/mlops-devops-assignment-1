@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,14 @@ type httpClient struct {
 // NewFromEnv returns a Client configured from environment variables.
 // If OPENAI_API_KEY is not set, it returns nil (caller can provide a simulated client).
 func NewFromEnv() Client {
+	// allow forcing simulated behavior even when a key exists
+	if v := os.Getenv("USE_REAL_LLM"); v != "" {
+		if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+			if !b {
+				return nil
+			}
+		}
+	}
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil
