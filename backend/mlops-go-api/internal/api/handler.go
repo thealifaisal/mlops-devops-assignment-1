@@ -127,6 +127,38 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		"latencyMs": reqObj.LatencyMS,
 		"usage":     reqObj.Usage,
 	}
+
+	// normalize usage into frontend-friendly shape: inputTokens / outputTokens
+	if reqObj.Usage != nil {
+		u := map[string]int{}
+		// copy any existing input/output keys first
+		if v, ok := reqObj.Usage["inputTokens"]; ok {
+			u["inputTokens"] = v
+		}
+		if v, ok := reqObj.Usage["outputTokens"]; ok {
+			u["outputTokens"] = v
+		}
+		// map common OpenAI keys
+		if v, ok := reqObj.Usage["prompt_tokens"]; ok {
+			if _, exists := u["inputTokens"]; !exists {
+				u["inputTokens"] = v
+			}
+		}
+		if v, ok := reqObj.Usage["completion_tokens"]; ok {
+			if _, exists := u["outputTokens"]; !exists {
+				u["outputTokens"] = v
+			}
+		}
+		if v, ok := reqObj.Usage["total_tokens"]; ok {
+			// if output not set, approximate from total - prompt
+			if _, outExists := u["outputTokens"]; !outExists {
+				if p, pOk := reqObj.Usage["prompt_tokens"]; pOk {
+					u["outputTokens"] = v - p
+				}
+			}
+		}
+		resp["usage"] = u
+	}
 	if reqObj.Status == "failed" {
 		resp["error"] = reqObj.Error
 	}
