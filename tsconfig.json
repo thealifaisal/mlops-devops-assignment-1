@@ -1,0 +1,6 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./frontend/mlops-react-app/tsconfig.json" }
+  ]
+}

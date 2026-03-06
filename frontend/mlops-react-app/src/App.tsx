@@ -51,6 +51,7 @@ export default function App() {
   const [meta, setMeta] = useState<any>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverAvailable, setServerAvailable] = useState<boolean>(true);
+  const [serverHealthInfo, setServerHealthInfo] = useState<any>({});
   const [isCheckingServer, setIsCheckingServer] = useState(false);
 
   const pollAbortRef = useRef<AbortController | null>(null);
@@ -94,6 +95,46 @@ export default function App() {
 
   useEffect(() => {
     loadOptions();
+  }, []);
+
+  // derived server status for display: running | idle | offline
+  const serverDisplayStatus = !serverAvailable ? 'offline' : (status === 'running' ? 'running' : 'idle');
+
+  // Poll backend health endpoint every 30s to update server availability
+  useEffect(() => {
+    let mounted = true;
+    const backendRoot = API_BASE.replace(/\/api\/?$/, "") || "";
+    const healthUrl = `${backendRoot}/health`;
+
+    async function checkHealth() {
+      try {
+        const res = await fetch(healthUrl, {cache: 'no-store'});
+        if (!mounted) return;
+        if (res.ok) {
+          setServerAvailable(true);
+          try {
+            const body = await res.json();
+            setServerHealthInfo(body);
+          } catch (_e) {
+            setServerHealthInfo({});
+          }
+        } else {
+          setServerAvailable(false);
+          setServerHealthInfo({});
+        }
+      } catch (_err) {
+        if (!mounted) return;
+        setServerAvailable(false);
+        setServerHealthInfo({});
+      }
+    }
+
+    checkHealth();
+    const iv = setInterval(checkHealth, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(iv);
+    };
   }, []);
 
   // ------------------------
@@ -242,7 +283,7 @@ export default function App() {
           <p className="small">Lightweight prompt playground</p>
         </div>
         <div className="controls">
-          <div className="small">Status: <span className="status-pill">{status||'idle'}</span></div>
+          {/* Server status shown in server card only; topbar left intentionally minimal */}
         </div>
       </div>
 
@@ -267,12 +308,11 @@ export default function App() {
             <label className="label" style={{marginTop:12}}>Input</label>
             <textarea className="textarea" placeholder="Enter text..." value={text} onChange={(e)=>setText(e.target.value)} />
 
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}>
+            <div style={{display:'flex',justifyContent:'flex-start',alignItems:'center',marginTop:12}}>
               <div style={{display:'flex',gap:8}}>
                 <button className="btn" onClick={onSubmit} disabled={!canSubmit}>{isSubmitting? 'Submitting...':'Generate'}</button>
                 <button className="btn-ghost" onClick={reset}>Reset</button>
               </div>
-              <div className="small">Request: {requestId || '—'}</div>
             </div>
 
             <div className="meta">
@@ -283,20 +323,49 @@ export default function App() {
         </div>
 
         <div>
-          <div className="card">
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div>
-                <div className="small">Status</div>
-                <div style={{fontWeight:700}}>{status || 'idle'}</div>
+          <div className="card status-card">
+            <div style={{display:'flex',justifyContent:'space-between',gap:12}}>
+              <div style={{flex:1}}>
+                <div className="small">Request Status</div>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginTop:6}}>
+                  <div style={{fontWeight:700}}>{serverDisplayStatus}</div>
+                  {/* spinner when server is processing a request, idle/offline icons otherwise */}
+                  {serverDisplayStatus === 'running' ? (
+                    <div className="spinner" aria-hidden></div>
+                  ) : (
+                    <div className={`health-dot ${serverDisplayStatus === 'idle' ? 'idle' : 'unhealthy'}`}></div>
+                  )}
+                </div>
+
+                {error && <div style={{marginTop:12,color:'#ff6b6b'}}>{error}</div>}
               </div>
-              <div className="small">ID: {requestId || '—'}</div>
+
+              <div style={{minWidth:220}}>
+                <div className="small">Server Health</div>
+                <div className="server-info" style={{display:'flex',alignItems:'center',gap:10,marginTop:6}}>
+                  <div className={`health-dot ${serverAvailable ? 'healthy' : 'unhealthy'}`} aria-hidden></div>
+                    <div style={{fontWeight:700}}>{serverAvailable ? 'online' : 'offline'}</div>
+                </div>
+                  {serverHealthInfo && serverHealthInfo.uptime && (
+                    <div className="small" style={{marginTop:8}}>uptime: {serverHealthInfo.uptime}</div>
+                  )}
+              </div>
+            </div>
+          </div>
+
+          <div className="card output-card" style={{marginTop:16}}>
+            <div>
+              <div className="small" style={{marginBottom:8}}>Output</div>
             </div>
 
-            {error && <div style={{marginTop:12,color:'#ffb4b4'}}>{error}</div>}
+            <div className="output" style={{marginTop:8}}>{output || 'Waiting for generation...'}</div>
 
-            <div style={{marginTop:12}} className="output">{output || 'Waiting for generation...'}</div>
+            <div style={{marginTop:12}}>
+              <label className="label">Request ID</label>
+              <input className="input" value={requestId || ''} disabled />
+            </div>
 
-            <div className="footer-note">Tip: switch options to try different prompt templates.</div>
+            <div className="footer-note" style={{marginTop:12}}>Tip: switch options to try different prompt templates.</div>
           </div>
         </div>
       </div>
