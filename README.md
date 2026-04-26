@@ -263,3 +263,123 @@ The system is complete when:
 3.  Polling /requests/{id} progresses queued → running → done
 4.  Frontend displays generated output
 5.  All responses follow API envelope format
+
+------------------------------------------------------------------------
+
+# V2: Lambda Integration (branch: lambda-integration)
+
+## Architecture (v2)
+
+User → React Frontend → Go Backend API → Postgres → AWS Lambda → OpenAI API
+
+The backend no longer calls OpenAI directly. Instead it invokes an AWS
+Lambda function which holds the OpenAI API key and handles the LLM call.
+All existing API endpoints, response formats, and database schema remain
+unchanged. The frontend is unaffected.
+
+## What Changed
+
+-   `internal/llm/client.go` — replaced the direct OpenAI HTTP client
+    with an AWS Lambda invoker using the AWS SDK for Go v2.
+-   `OPENAI_API_KEY` is removed from the backend. It now lives only
+    inside the Lambda function.
+-   Two new required environment variables replace it (see below).
+-   If `LAMBDA_FUNCTION_NAME` is not set the backend fails loudly at
+    startup. There is no silent fallback.
+
+## New Environment Variables (v2)
+
+| Variable               | Required | Default     | Description                          |
+|------------------------|----------|-------------|--------------------------------------|
+| LAMBDA_FUNCTION_NAME   | Yes      | —           | Name or ARN of the Lambda to invoke  |
+| AWS_REGION             | Yes      | us-east-1   | AWS region where the Lambda lives    |
+| AWS_ACCESS_KEY_ID      | Yes*     | —           | AWS credential (or use IAM role)     |
+| AWS_SECRET_ACCESS_KEY  | Yes*     | —           | AWS credential (or use IAM role)     |
+| LLM_MODEL              | No       | gpt-4o-mini | Model name passed to Lambda payload  |
+| PORT                   | No       | 8080        | HTTP port for the Go server          |
+| DATABASE_URL           | No       | —           | Postgres connection string           |
+
+*Not needed when running on EC2/ECS/EKS with an attached IAM role.
+
+## Removed Environment Variables (v2)
+
+-   `OPENAI_API_KEY` — moved into the Lambda function itself.
+-   `LLM_TIMEOUT_SECONDS` — timeout is now controlled inside Lambda.
+
+## Lambda Contract
+
+The backend sends and expects the following JSON shapes. The Lambda
+implementation (created manually in the AWS Console) must honour this
+contract exactly.
+
+### Input (backend → Lambda)
+
+```json
+{
+  "prompt": "Summarize the following text in 5 bullet points:\nSome user text here",
+  "model": "gpt-4o-mini",
+  "temperature": 0.2
+}
+```
+
+| Field       | Type   | Description                                      |
+|-------------|--------|--------------------------------------------------|
+| prompt      | string | Fully rendered prompt (template + variables)     |
+| model       | string | OpenAI model identifier                          |
+| temperature | float  | Sampling temperature (always 0.2 from backend)   |
+
+### Output (Lambda → backend)
+
+Success:
+
+```json
+{
+  "text": "• Bullet one\n• Bullet two\n...",
+  "usage": {
+    "inputTokens": 120,
+    "outputTokens": 80
+  }
+}
+```
+
+Error (Lambda must return this shape, not raise an exception):
+
+```json
+{
+  "text": "",
+  "usage": { "inputTokens": 0, "outputTokens": 0 },
+  "error": "Human-readable error message"
+}
+```
+
+| Field         | Type          | Description                               |
+|---------------|---------------|-------------------------------------------|
+| text          | string        | Generated LLM response text               |
+| usage         | object        | Token counts                              |
+| usage.inputTokens  | int      | Tokens in the prompt                      |
+| usage.outputTokens | int      | Tokens in the completion                  |
+| error         | string        | Non-empty only on failure                 |
+
+## Lambda Setup (AWS Console — high level)
+
+1.  Create a Lambda function in the AWS Console (any supported runtime).
+2.  Add the environment variable `OPENAI_API_KEY` to the Lambda's
+    configuration.
+3.  Implement the function to: parse the input JSON → call OpenAI Chat
+    Completions → return the output JSON above.
+4.  Attach an execution role that allows `lambda:InvokeFunction` for
+    this function to the IAM principal used by the backend.
+5.  Set `LAMBDA_FUNCTION_NAME` in the backend to the function name or
+    its full ARN.
+
+## Required IAM Permission (backend → Lambda)
+
+The AWS principal the backend authenticates as must have:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "lambda:InvokeFunction",
+  "Resource": "arn:aws:lambda:<region>:<account-id>:function:<function-name>"
+}
+```
