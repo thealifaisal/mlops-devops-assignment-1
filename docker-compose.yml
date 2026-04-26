@@ -25,6 +25,9 @@ services:
     env_file: .env
     environment:
       - PORT=8080
+      # On EC2: set BACKEND_BASE_URL=http://<ec2-public-ip>:8080 in .env to
+      # enable async Lambda invocation with callback. Leave unset for sync mode.
+      - BACKEND_BASE_URL=${BACKEND_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

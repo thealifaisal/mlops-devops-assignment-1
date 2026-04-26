@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -42,7 +43,7 @@ func (g *Generator) StartProcessing(id string) {
 
 		rendered := renderTemplate(prompt.Template, r.InputJSON)
 
-		// invoke Lambda-backed LLM — nil client means LAMBDA_FUNCTION_NAME was not set
+		// nil client means LAMBDA_FUNCTION_NAME was not set
 		if g.llm == nil {
 			log.Printf("generator: LAMBDA_FUNCTION_NAME is not configured — cannot process request %s", id)
 			r.Status = "failed"
@@ -51,9 +52,32 @@ func (g *Generator) StartProcessing(id string) {
 			_ = g.store.UpdateRequest(r)
 			return
 		}
-		start := time.Now()
+
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*120)
 		defer cancel()
+
+		// Async path: if BACKEND_BASE_URL is set and the client supports async invocation,
+		// fire Lambda as an Event and let it POST the result back via the callback endpoint.
+		// The goroutine exits immediately — no blocking on OpenAI.
+		if baseURL := os.Getenv("BACKEND_BASE_URL"); baseURL != "" {
+			if ac, ok := g.llm.(llm.AsyncClient); ok {
+				callbackURL := strings.TrimRight(baseURL, "/") + "/api/v1/internal/callback/" + r.ID
+				log.Printf("generator: async invocation for request %s, callback=%s", id, callbackURL)
+				if err := ac.GenerateAsync(ctx, rendered, callbackURL); err != nil {
+					log.Printf("generator: GenerateAsync error=%v", err)
+					r.Status = "failed"
+					r.Error = err.Error()
+					r.FinishedAt = time.Now()
+					_ = g.store.UpdateRequest(r)
+				}
+				// Lambda will call back to update the request
+				return
+			}
+		}
+
+		// Sync path: invoke Lambda and wait for the result (used when BACKEND_BASE_URL is not set).
+		log.Printf("generator: sync invocation for request %s", id)
+		start := time.Now()
 		text, usage, err := g.llm.Generate(ctx, rendered)
 		if err != nil {
 			log.Printf("generator: llm.Generate error=%v", err)
