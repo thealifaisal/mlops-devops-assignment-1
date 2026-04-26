@@ -199,11 +199,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		res["db"] = "memory"
 	}
 
-	// LLM presence
-	if llm.NewFromEnv() != nil {
-		res["llm"] = "available"
+	// Lambda config presence
+	if os.Getenv("LAMBDA_FUNCTION_NAME") != "" {
+		res["llm"] = "lambda configured"
 	} else {
-		res["llm"] = "unavailable"
+		res["llm"] = "lambda not configured"
 	}
 
 	writeSuccess(w, http.StatusOK, res)

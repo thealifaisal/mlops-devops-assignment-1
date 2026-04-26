@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
-	"log"
 
 	"mlops-go-api/internal/llm"
 	"mlops-go-api/internal/repo"
@@ -42,29 +42,28 @@ func (g *Generator) StartProcessing(id string) {
 
 		rendered := renderTemplate(prompt.Template, r.InputJSON)
 
-		// call LLM (fallback to simulated if no API key)
-		start := time.Now()
-		var text string
-		var usage map[string]int
+		// invoke Lambda-backed LLM — nil client means LAMBDA_FUNCTION_NAME was not set
 		if g.llm == nil {
-			log.Printf("generator: LLM client is nil, using simulated output")
-			text = fmt.Sprintf("Generated (simulated):\n%s", rendered)
-			usage = map[string]int{"inputTokens": 10, "outputTokens": 20}
-		} else {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*120)
-			defer cancel()
-			t, u, err := g.llm.Generate(ctx, rendered)
-			if err != nil {
-				log.Printf("generator: llm.Generate error=%v", err)
-				// fallback
-				text = fmt.Sprintf("Generated (simulated-fallback):\n%s", rendered)
-				usage = map[string]int{"inputTokens": 0, "outputTokens": 0}
-			} else {
-				log.Printf("generator: llm.Generate succeeded, tokens=%v", u)
-				text = t
-				usage = u
-			}
+			log.Printf("generator: LAMBDA_FUNCTION_NAME is not configured — cannot process request %s", id)
+			r.Status = "failed"
+			r.Error = "LLM_ERROR: LAMBDA_FUNCTION_NAME is not configured"
+			r.FinishedAt = time.Now()
+			_ = g.store.UpdateRequest(r)
+			return
 		}
+		start := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*120)
+		defer cancel()
+		text, usage, err := g.llm.Generate(ctx, rendered)
+		if err != nil {
+			log.Printf("generator: llm.Generate error=%v", err)
+			r.Status = "failed"
+			r.Error = err.Error()
+			r.FinishedAt = time.Now()
+			_ = g.store.UpdateRequest(r)
+			return
+		}
+		log.Printf("generator: llm.Generate succeeded, tokens=%v", usage)
 		latency := time.Since(start)
 
 		r.ResultText = text
