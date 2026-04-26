@@ -209,6 +209,61 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, res)
 }
 
+// callbackHandler receives the result from an async Lambda invocation.
+// Lambda POSTs here when it has finished calling OpenAI, so the backend
+// goroutine does not need to block waiting for the LLM response.
+//
+// Path: POST /api/v1/internal/callback/{requestId}
+func callbackHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "INVALID_METHOD", "only POST allowed")
+		return
+	}
+
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 6 {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "missing requestId")
+		return
+	}
+	id := parts[5]
+
+	var payload struct {
+		Text  string         `json:"text"`
+		Usage map[string]int `json:"usage"`
+		Error string         `json:"error"`
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_JSON", "cannot read body")
+		return
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_JSON", "invalid JSON")
+		return
+	}
+
+	reqObj, err := store.GetRequest(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "request not found")
+		return
+	}
+
+	if payload.Error != "" {
+		log.Printf("callback: request %s failed: %s", id, payload.Error)
+		reqObj.Status = "failed"
+		reqObj.Error = payload.Error
+	} else {
+		log.Printf("callback: request %s done, tokens=%v", id, payload.Usage)
+		reqObj.Status = "done"
+		reqObj.ResultText = payload.Text
+		reqObj.Usage = payload.Usage
+	}
+	reqObj.FinishedAt = time.Now()
+	_ = store.UpdateRequest(reqObj)
+
+	writeSuccess(w, http.StatusOK, map[string]string{"status": "received"})
+}
+
 // SetDeps allows tests to inject a repo and generator.
 func SetDeps(s repo.Repo, g *service.Generator) {
 	store = s
