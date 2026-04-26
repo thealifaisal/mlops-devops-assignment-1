@@ -9,6 +9,96 @@ must strictly follow this contract.
 
 ------------------------------------------------------------------------
 
+# High Level System Design
+
+## V1 — Direct OpenAI (branch: main)
+
+```
+┌─────────────┐     HTTP      ┌─────────────────────────────────────────┐
+│             │  GET/POST     │            EC2 / Docker Compose          │
+│   Browser   │ ──────────►  │                                           │
+│             │              │  ┌─────────────┐     ┌─────────────────┐ │
+└─────────────┘              │  │    React     │     │   Go Backend    │ │
+                             │  │  (Nginx:80) │────►│   (Port 8080)  │ │
+                             │  └─────────────┘     └────────┬────────┘ │
+                             │                               │           │
+                             │                    ┌──────────▼─────────┐│
+                             │                    │  PostgreSQL (5432)  ││
+                             │                    └────────────────────┘│
+                             └─────────────────────────────────────────┘
+                                                           │
+                                                  HTTPS (direct)
+                                                           │
+                                                  ┌────────▼────────┐
+                                                  │   OpenAI API    │
+                                                  └─────────────────┘
+```
+
+## V2 — Lambda Integration (branch: lambda-integration)
+
+```
+┌─────────────┐     HTTP      ┌─────────────────────────────────────────┐
+│             │  GET/POST     │            EC2 / Docker Compose          │
+│   Browser   │ ──────────►  │                                           │
+│             │              │  ┌─────────────┐     ┌─────────────────┐ │
+└─────────────┘              │  │    React     │     │   Go Backend    │ │
+                             │  │  (Nginx:80) │────►│   (Port 8080)  │ │
+                             │  └─────────────┘     └────────┬────────┘ │
+                             │                               │           │
+                             │                    ┌──────────▼─────────┐│
+                             │                    │  PostgreSQL (5432)  ││
+                             │                    └────────────────────┘│
+                             └─────────────────────────────────────────┘
+                                                           │
+                                                  AWS SDK (sync invoke)
+                                                           │
+                                                  ┌────────▼────────┐
+                                                  │  AWS Lambda     │
+                                                  │ (Python 3.x)    │
+                                                  └────────┬────────┘
+                                                           │
+                                                  HTTPS (direct)
+                                                           │
+                                                  ┌────────▼────────┐
+                                                  │   OpenAI API    │
+                                                  └─────────────────┘
+```
+
+## V3 — Async Lambda + Callback (branch: ec2-async-callback)
+
+```
+┌─────────────┐     HTTP      ┌─────────────────────────────────────────┐
+│             │  GET/POST     │            EC2 / Docker Compose          │
+│   Browser   │ ──────────►  │                                           │
+│  (polls     │              │  ┌─────────────┐     ┌─────────────────┐ │
+│   status)   │◄─────────────│  │    React     │     │   Go Backend    │ │
+└─────────────┘              │  │  (Nginx:80) │────►│   (Port 8080)  │ │
+                             │  └─────────────┘     └──────┬──────▲──┘ │
+                             │                             │      │     │
+                             │                    ┌────────▼──────┴───┐ │
+                             │                    │  PostgreSQL (5432) │ │
+                             │                    └───────────────────┘ │
+                             └─────────────────────────────────────────┘
+                                        │                    ▲
+                                 AWS SDK │                    │ HTTP POST
+                                (Event)  │                    │ /callback
+                                        ▼                    │
+                                  ┌─────────────────────────┐
+                                  │       AWS Lambda         │
+                                  │      (Python 3.x)        │
+                                  └────────────┬────────────┘
+                                               │ HTTPS
+                                               ▼
+                                       ┌───────────────┐
+                                       │  OpenAI API   │
+                                       └───────────────┘
+```
+
+**Key difference in V3:** Backend fires Lambda and returns immediately (non-blocking).
+Lambda calls OpenAI then POSTs the result back to `/api/v1/internal/callback/{id}`.
+
+------------------------------------------------------------------------
+
 # System Overview
 
 Architecture (v0):

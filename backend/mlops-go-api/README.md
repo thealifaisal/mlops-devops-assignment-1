@@ -2,6 +2,112 @@
 
 Simple Go backend implementing the v0 contract described in the repository README.
 
+---
+
+## High Level Backend Design
+
+### Internal Architecture
+
+```
+                        ┌──────────────────────────────────────────────┐
+                        │                  Go Backend                   │
+                        │                                               │
+  HTTP Request          │  ┌────────────┐       ┌────────────────────┐ │
+ ──────────────────────►│  │  Routes    │──────►│     Handlers       │ │
+                        │  │ /options   │       │  optionsHandler    │ │
+  HTTP Response         │  │ /generate  │       │  generateHandler   │ │
+ ◄──────────────────────│  │ /requests/ │       │  requestHandler    │ │
+                        │  │ /callback/ │       │  callbackHandler   │ │
+                        │  │ /health    │       │  healthHandler     │ │
+                        │  └────────────┘       └────────┬───────────┘ │
+                        │                                │              │
+                        │                    ┌───────────▼───────────┐ │
+                        │                    │   Generator Service   │ │
+                        │                    │  (goroutine per req)  │ │
+                        │                    └───────────┬───────────┘ │
+                        │                                │              │
+                        │              ┌─────────────────┼───────────┐ │
+                        │              │                 │           │ │
+                        │    ┌─────────▼──────┐  ┌──────▼────────┐  │ │
+                        │    │   Repo / Store │  │  LLM Client   │  │ │
+                        │    │  (DB or memory)│  │ (Lambda SDK)  │  │ │
+                        │    └─────────┬──────┘  └──────┬────────┘  │ │
+                        │              │                 │           │ │
+                        └──────────────┼─────────────────┼───────────┘ │
+                                       │                 │
+                              ┌────────▼──────┐  ┌───────▼────────┐
+                              │  PostgreSQL   │  │  AWS Lambda    │
+                              │  (or memory) │  │                │
+                              └───────────────┘  └────────────────┘
+```
+
+### Request Lifecycle
+
+```
+POST /api/v1/generate
+        │
+        ├─ Validate input
+        ├─ Fetch prompt from DB
+        ├─ Insert request row (status = queued)
+        ├─ Return 202 + requestId  ◄─── frontend gets this immediately
+        │
+        └─ Spawn goroutine
+                │
+                ├─ Set status = running
+                ├─ Render template (substitute {{variables}})
+                │
+                │          BACKEND_BASE_URL set?
+                │         ┌──────┴──────┐
+               Yes        │            No
+                │         │             │
+                │    Async invoke   Sync invoke
+                │    (Event mode)   (RequestResponse)
+                │         │             │
+                │         │             ▼
+                │         │       AWS Lambda → OpenAI
+                │         │             │
+                │         │        result returned
+                │         │             │
+                │    Lambda POSTs  ◄────┘
+                │    to /callback
+                │         │
+                └─────────┴─ Write result to DB (status = done / failed)
+
+GET /api/v1/requests/{id}   ◄── frontend polls this until done
+```
+
+### Package Structure
+
+```
+cmd/server/
+  main.go              Entry point, HTTP server, graceful shutdown
+
+internal/
+  api/
+    routes.go          Route registration
+    handler.go         HTTP handlers + callback endpoint
+    response.go        Standard envelope helpers (writeSuccess / writeError)
+
+  service/
+    generator.go       Async generation logic, sync/async Lambda path selection
+
+  llm/
+    client.go          Client + AsyncClient interfaces, Lambda SDK invocation
+
+  repo/
+    store.go           Repo interface, in-memory + Postgres implementations
+
+  db/
+    db.go              Postgres connection
+    migrate.go         Migration runner
+    migrations/        SQL migration files
+
+  model/
+    models.go          Prompt and Request structs
+```
+
+---
+
 Run locally:
 
 1. Ensure Go is installed (1.18+).
